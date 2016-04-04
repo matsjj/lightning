@@ -34,18 +34,13 @@ The node that wants to change the current status quo sends `LNPaymentAMessage`, 
 
 ```
     public int dice;
-    public ChannelStatus channelStatus;
+    public ChannelUpdate channelStatus;
     public RevocationHash newRevocation;
 ```
 
 with `ChannelStatus`,
 
 ``` 
-    public long amountClient;
-    public long amountServer;
-
-    public List<PaymentData> remainingPayments;
-
     public List<PaymentData> newPayments;
     public List<PaymentData> refundedPayments;
     public List<PaymentData> redeemedPayments;
@@ -84,7 +79,7 @@ with `ChannelStatus`,
 
 Each node sends `dice` to resolve conflicts when both parties start the exchange at the same time. The node that sent a higher dice value will have priority for this exchange, while the other party has to start over afterwards.
 
-Node B MUST make sure that all changed payments (new, redeemed, refunded) were previously part of the channel. Furthermore, node B MUST correctly calculate the resulting balances of applying these changes to the current status and fail the exchange if they don't match with the received amounts. [TODO: In the future we can remove redundant data like amounts / old payments, as each party stores them anyways..]
+Node B MUST make sure that all changed payments (new, redeemed, refunded) were previously part of the channel. Furthermore, node B MUST correctly calculate the resulting balances of applying these changes to the current status and fail the exchange if they don't match with the received amounts.
 
 Node B MUST further check that `feePerByte`, `csvDelay` in each `PaymentData` and in the `ChannelStatus` is within the allowed boundaries.
 
