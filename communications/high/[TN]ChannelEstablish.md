@@ -11,29 +11,30 @@ mats@blockchain.com
 
 ## Abstract
 
-Payments in the Lightning Network are done by shifting balances from one party to another in so called payment channels. The construction of the payment channel is done by sending back and forth the exact details of the channel and signatures that allow a safe revocation of any possible refund after the establish process is completed.
+Payments in the Lightning Network are done by shifting balances from one party to another in so called payment channels. The construction of the payment channel is done by sending back and forth the exact details of the channel and signatures that allow to refund the channel committed funds if anything were to fail.
 
 ## Specification
 
-Channel creation in this document follows the approach described in deployable-lightning[1]. It will soon be replaced by a less-complicated solution, utilizing the feature set from Segregated Witness.
+Currently we are exchanging 4 types of message:
 
-Currently we are exchanging 4 messages,
 ```
        Alice           Bob
  
          A     ->
                <-       A'
-               <-       B
-         B'    ->
-               <-       C
-         C'    ->
+         B     ->
+               <-       B'
+         C     ->
+               <-       C'
+         D     ->
+               <-       D'
 ```
 
 ### Phase A (channel establishment messages)
 
 The node that connects is usually the node that wants to create a payment channel with the other node, we call this node Alice, and its counterparty Bob. Upon connection, Alice will send a `LNEstablishAMessage`, containing:
 
-```
+```java
 // Data about the anchor
 public byte[] channelKeyServer;       // Public key (Alice)
 public long amountClient;             // Amount Bob should put in channel
@@ -54,20 +55,20 @@ Upon receipt of an `LNEstablishAMessage`, Bob will reply with another `LNEstabli
 
 ### Phase B (commitment transaction signatures)
 
-Once alice gets Bob’s A message, she can send her commitment signature. Technically Bob does not need to wait for Alice to do the same.
+Once alice gets Bob’s A message, she can send her commitment signature. Technically Bob does not need to wait for Alice to do the same, but in the current implementation it is still the case that all phase A messages must have been exchanged before phase B messages are.
 
-```
+```java
 public byte[] channelSignature;       // Signature for contparty’s commitment
 ```
 
-### Third phase (anchor signatures)
+### Phase C (anchor signatures)
 
 Upon receipt and verification of commitment signature in message B, message C is sent containing the anchor transaction with all our signatures.
 
-```
+```java
 public byte[] anchorSigned;             // Anchor with counterparty signature(s)
 ```
 
-## Resources
+### Phase D (channel established)
 
-[1] https://github.com/ElementsProject/lightning
+Once a node sees enough confirmations for the anchor, it sends its counterparty a D message that means that the channel has been established. The D message does not carry any data. Blockchain monitoring has not yet been implemented. Currently the library will not send these messages.
