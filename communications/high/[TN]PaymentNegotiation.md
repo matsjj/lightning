@@ -11,11 +11,11 @@ mats@blockchain.com
 
 ## Abstract
 
-Payments in the Lightning Network are done by shifting balances from one party to another in so called payment channels. When one party wants to make a payment, it starts the negotiation process for a new payment. In the process of doing so, both parties will create and sign a new commitment transaction for the other party and revoke any old transaction.
+Payments in the Lightning Network are done by shifting balances from one party to another in so called payment channels. When one party wants to make a new payment, both parties will create and sign a new version of the commitment transaction and provide revocation parameters to the counterparty.
 
 ## Specification
 
-There are six messages exchanged for agreeing on a new channel status. This involves adding, redeeming or refunding an arbitrary amount of payments.
+There are six messages exchanged when a payment is sent through the channel. This involves adding, redeeming or refunding arbitrary payments.
 
 ```
        Alice           Bob
@@ -23,58 +23,58 @@ There are six messages exchanged for agreeing on a new channel status. This invo
          A     ->
                <-       B
          C     ->
-               <-       C
+               <-       C'
          D     ->
-               <-       D
+               <-       D'
 ```
 
 Both, `LNPaymentCMessage` and `LNPaymentDMessage` are symmetrical, as both parties have to go through the same process of creating, validating and revoking new transactions and signatures.
 
-The node that wants to change the current status quo sends `LNPaymentAMessage`, containing
+The node that wants to change the current channel balance sends `LNPaymentAMessage`, containing:
 
-```
-    public int dice;
-    public ChannelUpdate channelStatus;
-    public RevocationHash newRevocation;
-```
-
-with `ChannelStatus`,
-
-``` 
-    public List<PaymentData> newPayments;
-    public List<PaymentData> refundedPayments;
-    public List<PaymentData> redeemedPayments;
-
-    public int feePerByte;
-    public long csvDelay;
+```java
+public int dice;                               // Random
+public ChannelUpdate channelStatus;
+public RevocationHash newRevocation;
 ```
 
-`PaymentData`,
+`ChannelStatus`:
 
+```java
+public List<PaymentData> newPayments;
+public List<PaymentData> refundedPayments;
+public List<PaymentData> redeemedPayments;
+
+public int feePerByte;
+public long csvDelay;
 ```
-    public boolean sending;
-    public long amount;
-    public long fee;
 
-    public PaymentSecret secret;
-    public int timestampOpen;
-    public int timestampRefund; 
-    public int csvDelay; 
+`PaymentData`:
 
-    public OnionObject onionObject;
+```java
+public boolean sending;
+public long amount;
+public long fee;
+
+public PaymentSecret secret;
+public int timestampOpen;
+public int timestampRefund;
+public int csvDelay;
+
+public OnionObject onionObject;
 ```
 
 `PaymentSecret` and
 
-```
-    public byte[] secret;
-    public byte[] hash;
+```java
+public byte[] secret;
+public byte[] hash;
 ```
 
 `OnionObject`
 
-```
-    public byte[] data;
+```java
+public byte[] data;
 ```
 
 Each node sends `dice` to resolve conflicts when both parties start the exchange at the same time. The node that sent a higher dice value will have priority for this exchange, while the other party has to start over afterwards.
@@ -85,8 +85,8 @@ Node B MUST further check that `feePerByte`, `csvDelay` in each `PaymentData` an
 
 Node B then responds with `LNPaymentBMessage` 
 
-```
-    public RevocationHash newRevocation;
+```java
+public RevocationHash newRevocation;
 ```
 
 Both nodes create the commit transaction for the other node plus a payment redeem/refund transaction for each payment. They will calculate the signatures for each of these and send it to the other node.
@@ -132,19 +132,18 @@ where `R` denominates the secret needed to redeem a payment, and `H` is the prei
 
 Node A and afterwards node B respond then with `LNPaymentCMessage`
 
-```
-    public byte[] newCommitSignature1;
-    public byte[] newCommitSignature2;
-    public List<byte[]> newPaymentSignatures;
+```java
+public byte[] newCommitSignature1;
+public byte[] newCommitSignature2;
+public List<byte[]> newPaymentSignatures;
 ```
 
 where each node MUST check the validity of each signature.
 
 Afterwards, both nodes exchange `LNPaymentDMessage`
 
-```
-    public List<RevocationHash> oldRevocationHashes;
+```java
+public List<RevocationHash> oldRevocationHashes;
 ```
 
 Each node MUST check if it received all old revocation hashes and if they are indeed correct. 
-

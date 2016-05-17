@@ -11,72 +11,64 @@ mats@blockchain.com
 
 ## Abstract
 
-Payments in the Lightning Network are done by shifting balances from one party to another in so called payment channels. The construction of the payment channel is done by sending back and forth the exact details of the channel and signatures that allow a safe revocation of any possible refund after the establish process is completed.
+Payments in the Lightning Network are done by shifting balances from one party to another in so called payment channels. The construction of the payment channel is done by sending back and forth the exact details of the channel and signatures that allow to refund the channel committed funds if anything were to fail.
 
 ## Specification
 
-Channel creation in this document follows the approach described in deployable-lightning[1]. It will soon be replaced by a less-complicated solution, utilizing the feature set from Segregated Witness.
+Currently we are exchanging 4 types of message:
 
-Currently we are exchanging 4 messages,
 ```
        Alice           Bob
  
          A     ->
-               <-       B
+               <-       A'
+         B     ->
+               <-       B'
          C     ->
-               <-       D
+               <-       C'
+         D     ->
+               <-       D'
 ```
 
-The node that connects is usually the node that wants to create a payment channel with the other node. Upon connection, it will send a `LNEstablishAMessage`, containing
+### Phase A (channel establishment messages)
 
-```
-    public byte[] pubKeyEscape;
-    public byte[] pubKeyFastEscape;
-    public byte[] secretHashFastEscape;
-    public byte[] revocationHash;
-    public long clientAmount;
-    public long serverAmount;
-```
+The node that connects is usually the node that wants to create a payment channel with the other node, we call this node Alice, and its counterparty Bob. Upon connection, Alice will send a `LNEstablishAMessage`, containing:
 
-where `pubKeyEscape`,`pubKeyFastEscape`,`secretHashFastEscape` and `revocationHash` are all used to create the channel in a way that makes it possible to (1) refund if the other party does disappear before broadcasting their half of the anchor (2) revoke the described refund in (1) after fully establishing the channel [1].
+```java
+// Data about the anchor
+public byte[] channelKeyServer;       // Public key (Alice)
+public long amountClient;             // Amount Bob should put in channel
+public long amountServer;             // Amount Alice commits to channel
+public byte[] anchorTransaction;      // Anchor with inputs from Alice
+public byte[] addressBytes;           // Bitcoin address from Alice
+public int minConfirmationAnchor;     // Minimum anchor confirmations
 
-The node will send `serverAmount`, the amount it will put into the channel, and `clientAmount`, the amount the node wishes the other node contributes into the channel. Currently all amounts are in satoshis, this will get changed to use millisatoshi in a later release.
-
-Node B will respond with `LNEstablishBMessage`, containing
-
-```
-    public byte[] pubKeyEscape;
-    public byte[] pubKeyFastEscape;
-    public byte[] secretHashFastEscape;
-    public byte[] revocationHash;
-    public byte[] anchorHash;
-    public long serverAmount;
+// Data about the first commitment to be able to refund if necessary
+public RevocationHash revocationHash; // Revocation hash from Alice
+public int feePerByte;                // On-chain transaction fee
+public long csvDelay;                 // Revocation grace period
 ```
 
-with similar contents as in `LNEstablishAMessage`. Node B can adjust `serverAmount`, if it wishes to change the amount it puts into the channel. If either node is not contented with the amounts each node puts into the channel, they MUST close the connection. 
-It also contains `anchorHash`, the hash of the anchor transaction of node B. 
+Alice will send `amountServer`, the amount it will put into the channel, and `amountClient`, the amount the node wishes the other node contributes into the channel. Currently all amounts are in satoshi. This will get changed to millisatoshi in a later release.
 
-Node A will respond with `LNEstablishCMessage`, containing
+Upon receipt of an `LNEstablishAMessage`, Bob will reply with another `LNEstablishAMessage`, (optionally) appending inputs and change outputs to the anchor, but still not signing it. If Bob is not required to put funds in the channel, then it is not necessary for him to alter the anchor transaction.
 
-```
-    public byte[] signatureEscape;
-    public byte[] signatureFastEscape;
-    public byte[] anchorHash;
-```
+### Phase B (commitment transaction signatures)
 
-with two signatures for escape transactions as outlined it [1]. The escape transactions point at the `anchorHash` sent in `LNEstablishBMessage`. Node B MUST confirm that the signatures are indeed correct or it is bound to lose all money put into the channel. 
+Once alice gets Bob’s A message, she can send her commitment signature. Technically Bob does not need to wait for Alice to do the same, but in the current implementation it is still the case that all phase A messages must have been exchanged before phase B messages are.
 
-Afterwards node B responds with `LNEstablishDMessage`, containing
-
-```
-    public byte[] signatureEscape;
-    public byte[] signatureFastEscape;
+```java
+public byte[] channelSignature;       // Signature for contparty’s commitment
 ```
 
-similar as in `LNEstablishCMessage`. Node B MUST check the signatures. 
+### Phase C (anchor signatures)
 
-After receiving either `LNEstablishCMessage` or `LNEstablishDMessage`, each node will broadcast their anchor and wait for sufficient confirmations. Afterwards they are able to process payments. [TODO: Implement a channel_ready message]
+Upon receipt and verification of commitment signature in message B, message C is sent containing the anchor transaction with all our signatures.
 
-## Resources
+```java
+public byte[] anchorSigned;             // Anchor with counterparty signature(s)
+```
 
-[1] https://github.com/ElementsProject/lightning
+### Phase D (channel established)
+
+Once a node sees enough confirmations for the anchor, it sends its counterparty a D message that means that the channel has been established. The D message does not carry any data. Blockchain monitoring has not yet been implemented. Currently the library will not send these messages.
