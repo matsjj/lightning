@@ -133,9 +133,8 @@ where `R` denominates the secret needed to redeem a payment, and `H` is the prei
 Node A and afterwards node B respond then with `LNPaymentCMessage`
 
 ```java
-public byte[] newCommitSignature1;
-public byte[] newCommitSignature2;
-public List<byte[]> newPaymentSignatures;
+public List<byte[]> channelSignatures;
+public List<byte[]> paymentSignatures;
 ```
 
 where each node MUST check the validity of each signature.
