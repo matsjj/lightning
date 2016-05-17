@@ -49,9 +49,13 @@ public int feePerByte;                // On-chain transaction fee
 public long csvDelay;                 // Revocation grace period
 ```
 
+See below for more information about the final anchor transaction.
+
 Alice will send `amountServer`, the amount it will put into the channel, and `amountClient`, the amount the node wishes the other node contributes into the channel. Currently all amounts are in satoshi. This will get changed to millisatoshi in a later release.
 
 Upon receipt of an `LNEstablishAMessage`, Bob will reply with another `LNEstablishAMessage`, (optionally) appending inputs and change outputs to the anchor, but still not signing it. If Bob is not required to put funds in the channel, then it is not necessary for him to alter the anchor transaction.
+
+Both parties MUST check all inputs of `anchorTransaction` to make sure that each input is paying to a witness-formatted scriptPubKey, such that the final anchorTransaction is not subject to transaction malleability.
 
 ### Phase B (commitment transaction signatures)
 
@@ -72,3 +76,23 @@ public byte[] anchorSigned;             // Anchor with counterparty signature(s)
 ### Phase D (channel established)
 
 Once a node sees enough confirmations for the anchor, it sends its counterparty a D message that means that the channel has been established. The D message does not carry any data. Blockchain monitoring has not yet been implemented. Currently the library will not send these messages.
+
+## Anchor Transaction
+
+The final design of the anchor will look like
+
+```
+   In:
+  txInA1
+  txInA2
+  […]
+  txInB1
+  txInB2
+  […]
+   Out:
+  2-of-2 A & B
+  Change A
+  Change B
+```
+
+The 2-of-2 has keys lexicographically ordered. 
